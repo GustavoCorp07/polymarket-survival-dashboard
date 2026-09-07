@@ -322,6 +322,9 @@ let balanceFp = '';
 let baseUptimeSec = 0;
 let baseUptimeAt = performance.now();
 let nextCycleTs = null;
+let startedAtMs = null;
+let cycleMinutes = 10;
+let isStaticMirror = false;
 let userPinnedLog = false;
 
 function fmtMoney(n, sign=false) {
@@ -567,16 +570,25 @@ function drawMarket(state) {
 }
 
 function tickClocks() {
-  const live = baseUptimeSec + (performance.now() - baseUptimeAt)/1000;
+  // Prefer wall-clock from started_at so static Pages mirrors keep ticking
+  let live;
+  if (startedAtMs && !Number.isNaN(startedAtMs)) {
+    live = Math.max(0, (Date.now() - startedAtMs) / 1000);
+  } else {
+    live = baseUptimeSec + (performance.now() - baseUptimeAt)/1000;
+  }
   setText('uptime', fmtUptime(live));
   setText('hoursAlive', (live/3600).toFixed(1));
   if (nextCycleTs) {
-    const ms = Date.parse(nextCycleTs) - Date.now();
-    if (ms <= 0) setText('nextCycle', '0:00');
-    else {
-      const sec = Math.floor(ms/1000);
-      setText('nextCycle', Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0'));
+    let target = Date.parse(nextCycleTs);
+    const period = Math.max(1, cycleMinutes) * 60 * 1000;
+    // On a frozen snapshot, roll the countdown forward so it never sticks at 0:00
+    if (!Number.isNaN(target) && period > 0) {
+      while (target <= Date.now()) target += period;
     }
+    const ms = target - Date.now();
+    const sec = Math.max(0, Math.floor(ms/1000));
+    setText('nextCycle', Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0'));
   }
 }
 
@@ -620,13 +632,26 @@ function applyScalars(state) {
   setText('best', fmtMoney(best, true));
   setText('worst', fmtMoney(worst, true));
   $('worst').className = 'mv' + (worst<0?' red':'');
-  setText('footerLeft', state.footer || 'GROK BOT · POLYMARKET · PAPER · AUTONOMOUS · KIMI K3');
+  let foot = state.footer || 'GROK BOT · POLYMARKET · PAPER · AUTONOMOUS · KIMI K3';
+  if (isStaticMirror) foot += ' · PAGES SNAPSHOT';
+  setText('footerLeft', foot);
 }
 
 function render(state) {
   lastState = state;
-  baseUptimeSec = Number(state.uptime_seconds)||0;
-  baseUptimeAt = performance.now();
+  cycleMinutes = Number(state.cycle_minutes)||10;
+  // Anchor uptime to started_at / updated_at so re-polling a static snapshot does not freeze the clock
+  const startIso = state.started_at || state.server_started_at || null;
+  if (startIso) {
+    const ms = Date.parse(startIso);
+    if (!Number.isNaN(ms)) startedAtMs = ms;
+  } else if (state.updated_at && state.uptime_seconds != null) {
+    const u = Date.parse(state.updated_at);
+    if (!Number.isNaN(u)) startedAtMs = u - (Number(state.uptime_seconds)||0)*1000;
+  } else {
+    baseUptimeSec = Number(state.uptime_seconds)||0;
+    baseUptimeAt = performance.now();
+  }
   nextCycleTs = state.next_cycle_ts || null;
   applyScalars(state);
   drawActivity(state.activity);
@@ -648,15 +673,18 @@ async function poll() {
     const urls = ['/api/state?t=' + bust, './state.json?t=' + bust, 'state.json?t=' + bust];
     let st = null;
     let lastErr = null;
+    let fromLive = false;
     for (const u of urls) {
       try {
         const r = await fetch(u, {cache:'no-store'});
         if (!r.ok) { lastErr = new Error('state '+r.status+' '+u); continue; }
         st = await r.json();
+        fromLive = u.startsWith('/api/state');
         break;
       } catch (e) { lastErr = e; }
     }
     if (!st) throw lastErr || new Error('no state');
+    isStaticMirror = !fromLive;
     render(st);
   } catch (e) {
     console.warn(e);
