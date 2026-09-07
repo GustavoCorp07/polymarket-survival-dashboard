@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-store"/>
+<title>GROK BOT / SURVIVAL MODE</title>
+<style>
+  :root {
+    --bg: #000;
+    --panel: #050505;
+    --border: #1a1a1a;
+    --border2: #2a2a2a;
+    --muted: #6b6b6b;
+    --dim: #9a9a9a;
+    --text: #e8e8e8;
+    --white: #fff;
+    --green: #00FF7F;
+    --red: #FF4D6D;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    font-size: 12px;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 14px 8px;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+  }
+  .hdr {
+    display: flex; justify-content: space-between; align-items: center;
+    letter-spacing: 0.04em; text-transform: uppercase; flex: 0 0 auto;
+    min-width: 0; gap: 12px;
+  }
+  .hdr-left {
+    display: flex; align-items: center; gap: 12px; font-weight: 700;
+    color: var(--white); font-size: 13px; min-width: 0;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border2); border-radius: 999px;
+    padding: 2px 10px 2px 8px; font-size: 11px; font-weight: 600;
+    color: var(--dim); flex: 0 0 auto;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #555; }
+  .pill.alive { color: var(--green); border-color: #0a3d28; }
+  .pill.alive .dot { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1.6s ease-in-out infinite; }
+  .pill.critical { color: var(--red); border-color: #4a1522; }
+  .pill.critical .dot { background: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse 0.8s ease-in-out infinite; }
+  .pill.boot { color: var(--dim); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+  .hdr-right { color: var(--dim); font-size: 11px; display: flex; gap: 10px; flex: 0 0 auto; white-space: nowrap; }
+  .hdr-right span span { color: var(--text); }
+
+  .cards {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; flex: 0 0 auto;
+  }
+  .card {
+    border: 1px solid var(--border2); background: var(--panel);
+    padding: 10px 14px 12px; min-width: 0; min-height: 72px;
+  }
+  .card .lbl { color: var(--muted); font-size: 10px; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .card .val { font-size: 26px; font-weight: 600; color: var(--white); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .card .sub { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .card .val.green, .sub.green { color: var(--green); }
+  .card .val.red, .sub.red { color: var(--red); }
+
+  .mid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+  }
+  .panel {
+    border: 1px solid var(--border2); background: var(--panel);
+    display: flex; flex-direction: column;
+    min-height: 0; min-width: 0; overflow: hidden;
+  }
+  .panel-h {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; color: var(--muted); font-size: 11px; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border); flex: 0 0 auto; gap: 8px;
+  }
+  .panel-h > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel-h .r { color: var(--dim); flex: 0 0 auto; white-space: nowrap; }
+  .chart-wrap { flex: 1 1 auto; position: relative; min-height: 0; min-width: 0; padding: 4px 8px 4px 4px; overflow: hidden; }
+  #balChart { width: 100%; height: 100%; display: block; }
+  .awaiting {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #2a2a2a; font-size: 18px; letter-spacing: 0.12em; pointer-events: none;
+  }
+
+  .right-col {
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 0; min-width: 0; overflow: hidden;
+  }
+  .right-col .panel.log {
+    flex: 1.15 1 0;
+    min-height: 160px;
+  }
+  .right-col .panel.space {
+    flex: 1 1 0;
+    min-height: 140px;
+  }
+  #activity {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px 12px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+    scrollbar-gutter: stable;
+  }
+  #activity .line {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    padding: 1px 0;
+  }
+  #activity .clk { color: #555; white-space: nowrap; }
+  #activity .green { color: var(--green); }
+  #activity .red, #activity .pink { color: var(--red); }
+  #activity .white { color: var(--text); }
+  #activity .muted { color: var(--muted); }
+  .space-body { flex: 1 1 auto; position: relative; m
