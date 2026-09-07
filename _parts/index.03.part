@@ -1,0 +1,150 @@
+22'; ctx.lineWidth = 1;
+  edges.forEach(([a,b]) => {
+    const p=project(...corners[a]), q=project(...corners[b]);
+    ctx.beginPath(); ctx.moveTo(p[0],p[1]); ctx.lineTo(q[0],q[1]); ctx.stroke();
+  });
+
+  let hi = null;
+  pts.slice(0,400).forEach(p => {
+    const x = Math.min(1, Math.max(0, +p.x||0));
+    const y = Math.min(1, Math.max(0, (+p.y||0)/0.25));
+    const z = Math.min(1, Math.max(0, +p.z||0));
+    const [px,py] = project(x,y,z);
+    const hl = p.highlight || (+p.y||0) >= 0.08;
+    ctx.fillStyle = hl ? '#00FF7F' : '#cfcfcf';
+    ctx.globalAlpha = hl ? 1 : 0.55;
+    ctx.fillRect(px-1, py-1, 2, 2);
+    if (hl && (!hi || (+p.y||0) > (+hi.y||0))) hi = {p, px, py};
+  });
+  ctx.globalAlpha = 1;
+  if (hi) {
+    const mid = (hi.p.mid!=null)? Number(hi.p.mid).toFixed(2) : '—';
+    const eg = ((+hi.p.y||+hi.p.edge||0)*100).toFixed(1);
+    ctx.strokeStyle = '#00FF7F';
+    ctx.beginPath(); ctx.moveTo(hi.px, hi.py); ctx.lineTo(hi.px+28, hi.py-18); ctx.stroke();
+    ctx.fillStyle = '#00FF7F';
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText(mid+' / +'+eg+'%', hi.px+30, hi.py-20);
+  }
+}
+
+function tickClocks() {
+  const live = baseUptimeSec + (performance.now() - baseUptimeAt)/1000;
+  setText('uptime', fmtUptime(live));
+  setText('hoursAlive', (live/3600).toFixed(1));
+  if (nextCycleTs) {
+    const ms = Date.parse(nextCycleTs) - Date.now();
+    if (ms <= 0) setText('nextCycle', '0:00');
+    else {
+      const sec = Math.floor(ms/1000);
+      setText('nextCycle', Math.floor(sec/60) + ':' + String(sec%60).padStart(2,'0'));
+    }
+  }
+}
+
+function applyScalars(state) {
+  setStatus(state.status);
+  setText('cycle', state.cycle || 0);
+  setText('pid', state.pid || '—');
+  setText('balance', fmtMoney(state.balance));
+  setText('initial', 'initial: ' + fmtMoney(state.initial));
+  const pnl = Number(state.pnl)||0;
+  setText('pnl', fmtMoney(pnl, true));
+  $('pnl').className = 'val ' + (pnl>=0?'green':'red');
+  const pp = Number(state.pnl_pct)||0;
+  setText('pnlPct', (pp>=0?'+':'') + pp.toFixed(1) + '%');
+  $('pnlPct').className = 'sub ' + (pp>=0?'green':'red');
+  setText('sub', fmtMoney(state.subscription||0));
+  setText('subDue', state.subscription_label || '$200/mo · due');
+  setText('winRate', (Number(state.win_rate)||0).toFixed(1) + '%');
+  setText('wl', (state.wins||0) + 'W / ' + (state.losses||0) + 'L');
+  setText('resolved', state.resolved_count || 0);
+  setText('liveN', (state.markets_live||0).toLocaleString());
+  setText('cryptoN', 'CRYPTO ' + (state.crypto||0));
+  setText('weatherN', 'WEATHER ' + (state.weather||0));
+  setText('overN', (state.over_8pct||0) + ' OVER +8.0%');
+
+  const sv = state.survival || {};
+  setText('runway', (sv.runway_days||0) + ' days');
+  $('runway').className = 'mv' + ((sv.runway_days||0)<=3?' red':'');
+  const rw = Math.min(100, (sv.runway_days||0)/30*100);
+  $('runwayBar').style.width = rw + '%';
+  $('runwayBar').style.background = (sv.runway_days||0)<=3 ? '#FF4D6D' : '#00FF7F';
+  setText('dailyCost', '-$' + Math.abs(Number(sv.daily_cost)||6.58).toFixed(2));
+  setText('trades', sv.trades||0);
+  const sc = sv.scanned||0;
+  setText('scanned', sc >= 1000 ? (sc/1000).toFixed(1).replace(/\.0$/,'')+'K' : sc);
+  setText('avgBet', fmtMoney(sv.avg_bet||0));
+  setText('avgEdge', (Number(sv.avg_edge)||0).toFixed(1) + '%');
+  setText('killAt', Number(sv.kill_at||0).toFixed(2));
+  setText('cyc48', sv.cycles_per_48h || 288);
+  const best = Number(sv.best)||0, worst = Number(sv.worst)||0;
+  setText('best', fmtMoney(best, true));
+  setText('worst', fmtMoney(worst, true));
+  $('worst').className = 'mv' + (worst<0?' red':'');
+  setText('footerLeft', state.footer || 'GROK BOT · POLYMARKET · PAPER · AUTONOMOUS · KIMI K3');
+}
+
+function render(state) {
+  lastState = state;
+  baseUptimeSec = Number(state.uptime_seconds)||0;
+  baseUptimeAt = performance.now();
+  nextCycleTs = state.next_cycle_ts || null;
+  applyScalars(state);
+  drawActivity(state.activity);
+  drawAgents(state.agents);
+  const bfp = JSON.stringify(state.balance_history||[]) + '|' + (state.pnl||0);
+  if (bfp !== balanceFp) {
+    balanceFp = bfp;
+    drawBalance(state);
+  }
+  tickClocks();
+}
+
+async function poll() {
+  if (pollBusy) return;
+  pollBusy = true;
+  try {
+    const urls = ['/api/state?t=' + Date.now(), './state.json?t=' + Date.now()];
+    let st = null, lastErr = null;
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, {cache:'no-store'});
+        if (!r.ok) throw new Error(url + ' ' + r.status);
+        st = await r.json();
+        break;
+      } catch (e) { lastErr = e; }
+    }
+    if (!st) throw lastErr || new Error('no state');
+    render(st);
+  } catch (e) {
+    console.warn(e);
+  } finally {
+    pollBusy = false;
+  }
+}
+
+function animate() {
+  rot += 0.006;
+  if (lastState) drawMarket(lastState);
+  requestAnimationFrame(animate);
+}
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!lastState) return;
+    balanceFp = '';
+    drawBalance(lastState);
+    drawMarket(lastState);
+  }, 80);
+});
+
+poll();
+setInterval(poll, 1000);
+setInterval(tickClocks, 250);
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

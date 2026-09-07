@@ -1,99 +1,4 @@
-nel log">
-        <div class="panel-h">
-          <span>// ACTIVITY LOG</span>
-          <span class="r"><span id="resolved">0</span> RESOLVED</span>
-        </div>
-        <div id="activity"></div>
-      </div>
-      <div class="panel space">
-        <div class="panel-h">
-          <span>// MARKET SPACE · LIVE SCAN</span>
-          <span class="r"><span id="liveN">0</span> LIVE</span>
-        </div>
-        <div class="space-body"><canvas id="mktCanvas"></canvas></div>
-        <div class="space-foot">
-          <span>x LIQUIDITY &nbsp; y EDGE &nbsp; z BOOK</span>
-          <span><span id="cryptoN">CRYPTO 0</span> &nbsp; <span id="weatherN">WEATHER 0</span> &nbsp; <span id="overN">0 OVER +8.0%</span></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="strip">
-    <div class="strip-h">
-      <span>// SURVIVAL + LEDGER</span>
-      <span>KILL AT $<span id="killAt">0.00</span> · <span id="cyc48">288</span> CYCLES / 48H</span>
-    </div>
-    <div class="strip-row">
-      <div class="metric">
-        <div class="ml">RUNWAY</div>
-        <div class="mv" id="runway">0 days</div>
-        <div class="runway-bar"><i id="runwayBar" style="width:0%"></i></div>
-      </div>
-      <div class="metric"><div class="ml">DAILY COST</div><div class="mv red" id="dailyCost">-$6.58</div></div>
-      <div class="metric"><div class="ml">TRADES</div><div class="mv" id="trades">0</div></div>
-      <div class="metric"><div class="ml">SCANNED</div><div class="mv" id="scanned">0</div></div>
-      <div class="metric"><div class="ml">AVG BET</div><div class="mv" id="avgBet">$0.00</div></div>
-      <div class="metric"><div class="ml">AVG EDGE</div><div class="mv" id="avgEdge">0.0%</div></div>
-      <div class="metric"><div class="ml">BEST</div><div class="mv green" id="best">+$0.00</div></div>
-      <div class="metric"><div class="ml">WORST</div><div class="mv" id="worst">+$0.00</div></div>
-    </div>
-  </div>
-
-  <div class="agents" id="agents"></div>
-
-  <div class="ftr">
-    <div class="left" id="footerLeft">GROK BOT · POLYMARKET · PAPER · AUTONOMOUS · KIMI K3</div>
-    <div class="wm">ARGONA</div>
-    <div class="right">NEXT CYCLE <span id="nextCycle">10:00</span></div>
-  </div>
-
-<script>
-const $ = (id) => document.getElementById(id);
-
-let lastState = null;
-let rot = 0.35;
-let pollBusy = false;
-let activityFp = '';
-let agentsFp = '';
-let balanceFp = '';
-let baseUptimeSec = 0;
-let baseUptimeAt = performance.now();
-let nextCycleTs = null;
-let userPinnedLog = false;
-
-function fmtMoney(n, sign=false) {
-  const v = Number(n)||0;
-  const abs = Math.abs(v).toFixed(2);
-  if (sign) return (v>=0? '+':'−') + '$' + abs;
-  return '$' + abs;
-}
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-function setText(id, text) {
-  const el = $(id);
-  if (!el) return;
-  const t = String(text);
-  if (el.textContent !== t) el.textContent = t;
-}
-function setStatus(s) {
-  const pill = $('statusPill');
-  const cls = 'pill ' + (s||'BOOT').toLowerCase();
-  if (pill.className !== cls) pill.className = cls;
-  setText('statusTxt', s || 'BOOT');
-}
-function fmtUptime(sec) {
-  sec = Math.max(0, Math.floor(sec));
-  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
-  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-}
-
-function iconSvg(kind, color) {
-  const eyes = `<rect x="10" y="11" width="2.2" height="8" rx="1" fill="#000"/><rect x="15.8" y="11" width="2.2" height="8" rx="1" fill="#000"/>`;
-  if (kind==='cloud') return `<svg width="28" height="28" viewBox="0 0 28 28"><ellipse cx="14" cy="15" rx="12" ry="9" fill="${color}"/>${eyes}</svg>`;
-  if (kind==='circle') return `<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="${color}"/>${eyes}</svg>`;
-  if (kind==='drop') return `<svg width="28" height="28" viewBox="0 0 28 28"><path d="M14 2 C14 2 24 14 24 18 A10 10 0 0 1 4 18 C4 14 14 2 14 2Z" fill="${color}"/>${eyes}</svg>`;
+ 2Z" fill="${color}"/>${eyes}</svg>`;
   if (kind==='pill') return `<svg width="28" height="28" viewBox="0 0 28 28"><rect x="3" y="8" width="22" height="12" rx="6" fill="${color}"/>${eyes}</svg>`;
   if (kind==='triangle') return `<svg width="28" height="28" viewBox="0 0 28 28"><path d="M14 3 L26 24 L2 24 Z" fill="${color}"/><rect x="10" y="13" width="2.2" height="7" rx="1" fill="#000"/><rect x="15.8" y="13" width="2.2" height="7" rx="1" fill="#000"/></svg>`;
   return `<svg width="28" height="28" viewBox="0 0 28 28"><rect x="4" y="4" width="20" height="20" rx="5" fill="${color}"/>${eyes}</svg>`;
@@ -111,4 +16,167 @@ function drawAgents(agents) {
     const c = a.color || '#888';
     el.innerHTML = `
       <div class="num">${escapeHtml(a.id||'')}</div>
-      <div clas
+      <div class="ico">${iconSvg(a.icon, c)}</div>
+      <div class="name">${escapeHtml(a.name||'')}</div>
+      <div class="owns">${escapeHtml(a.owns||'')}<br/>${escapeHtml(a.never||'')}</div>
+      <div class="stat" style="color:${c}" title="${escapeHtml(a.stat||'')}">${escapeHtml(a.stat||'—')}</div>`;
+    root.appendChild(el);
+  });
+}
+
+function drawActivity(list) {
+  const rows = (list||[]).slice(0, 120);
+  const fp = JSON.stringify(rows);
+  if (fp === activityFp) return;
+  activityFp = fp;
+  const act = $('activity');
+  const nearTop = act.scrollTop < 24;
+  const prevBottom = act.scrollHeight - act.scrollTop;
+  act.innerHTML = rows.map(a => {
+    const cls = a.color || 'muted';
+    return `<div class="line"><span class="clk">[${escapeHtml(a.clock||'??:??:??')}]</span> <span class="${cls}">${escapeHtml(a.msg||'')}</span></div>`;
+  }).join('');
+  if (!userPinnedLog || nearTop) {
+    act.scrollTop = 0; // newest first
+  } else {
+    act.scrollTop = Math.max(0, act.scrollHeight - prevBottom);
+  }
+}
+
+$('activity').addEventListener('scroll', () => {
+  userPinnedLog = $('activity').scrollTop > 24;
+}, {passive:true});
+
+function drawBalance(state) {
+  const canvas = $('balChart');
+  const wrap = canvas.parentElement;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, wrap.clientWidth), h = Math.max(1, wrap.clientHeight);
+  if (canvas.width !== Math.floor(w*dpr) || canvas.height !== Math.floor(h*dpr)) {
+    canvas.width = Math.floor(w*dpr);
+    canvas.height = Math.floor(h*dpr);
+    canvas.style.width = w+'px';
+    canvas.style.height = h+'px';
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const hist = state.balance_history || [];
+  const be = Number(state.break_even)||50;
+  $('awaiting').style.display = hist.length < 2 ? 'flex' : 'none';
+
+  const pad = {l:44, r:56, t:16, b:28};
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  const hours = 48;
+  let minB = Math.min(be, ...hist.map(p=>+p.balance||be));
+  let maxB = Math.max(be, ...hist.map(p=>+p.balance||be));
+  minB = Math.max(1, minB*0.85);
+  maxB = Math.max(maxB*1.15, be*1.2);
+
+  function yLog(v) {
+    const a = Math.log(minB), b = Math.log(maxB);
+    return pad.t + ch * (1 - (Math.log(Math.max(v,1)) - a) / (b-a));
+  }
+  function xH(hr) { return pad.l + (hr/hours)*cw; }
+
+  ctx.strokeStyle = '#151515'; ctx.lineWidth = 1;
+  const yTicks = [];
+  let t = Math.pow(10, Math.floor(Math.log10(minB)));
+  while (t < maxB*1.01) {
+    if (t >= minB*0.95) yTicks.push(t);
+    t *= 2;
+    if (yTicks.length > 8) break;
+  }
+  if (!yTicks.includes(be) && be>=minB && be<=maxB) yTicks.push(be);
+  yTicks.sort((a,b)=>a-b);
+  ctx.fillStyle = '#444'; ctx.font = '10px ui-monospace, monospace';
+  yTicks.forEach(v => {
+    const y = yLog(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+cw, y); ctx.stroke();
+    ctx.fillText('$'+Math.round(v), 4, y+3);
+  });
+  for (let hr=0; hr<=48; hr+=6) {
+    ctx.fillStyle = '#444';
+    ctx.fillText(hr+'H', xH(hr)-6, h-8);
+  }
+
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle = '#333';
+  ctx.beginPath(); ctx.moveTo(pad.l, yLog(be)); ctx.lineTo(pad.l+cw, yLog(be)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#555';
+  ctx.fillText('BREAK-EVEN $'+be.toFixed(0), pad.l+8, yLog(be)-6);
+
+  if (hist.length < 1) return;
+  const t0 = Date.parse(hist[0].ts || state.updated_at);
+  const hoursAlive = Number(state.hours_alive)||0;
+  function ptX(p, i) {
+    const ts = Date.parse(p.ts||t0);
+    let hr = (ts - t0) / 3600000;
+    if (!isFinite(hr)) hr = (i / Math.max(1,hist.length-1)) * Math.min(hoursAlive, 48);
+    return xH(Math.min(48, Math.max(0, hr)));
+  }
+
+  const pnl = Number(state.pnl)||0;
+  const lineColor = pnl >= 0 ? '#00FF7F' : '#FF4D6D';
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  hist.forEach((p,i) => {
+    const x = ptX(p,i), y = yLog(+p.balance||be);
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  if (state.pivot) {
+    const pb = +state.pivot.balance;
+    let best=0, bd=1e9;
+    hist.forEach((p,i)=>{ const d=Math.abs(+p.balance-pb); if(d<bd){bd=d;best=i;} });
+    const x = ptX(hist[best], best);
+    ctx.setLineDash([3,3]); ctx.strokeStyle = '#FF4D6D';
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t+ch); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ccc'; ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText('PIVOT', x+4, pad.t+14);
+    ctx.fillStyle = '#FF4D6D';
+    ctx.fillText('$'+pb.toFixed(0)+' RUNWAY', x+4, pad.t+28);
+  }
+
+  const last = hist[hist.length-1];
+  const lx = ptX(last, hist.length-1), ly = yLog(+last.balance||be);
+  ctx.fillStyle = lineColor;
+  ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI*2); ctx.fill();
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.fillText(fmtMoney(last.balance), lx+8, ly+4);
+}
+
+function drawMarket(state) {
+  const canvas = $('mktCanvas');
+  const wrap = canvas.parentElement;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, wrap.clientWidth), h = Math.max(1, wrap.clientHeight);
+  if (canvas.width !== Math.floor(w*dpr) || canvas.height !== Math.floor(h*dpr)) {
+    canvas.width = Math.floor(w*dpr);
+    canvas.height = Math.floor(h*dpr);
+    canvas.style.width = w+'px';
+    canvas.style.height = h+'px';
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const pts = state.market_points || [];
+  const cx=w*0.5, cy=h*0.52, sx=w*0.38, sy=h*0.32;
+  function project(x,y,z) {
+    const X = (x-0.5)*2, Y=(y-0.5)*2, Z=(z-0.5)*2;
+    const c=Math.cos(rot), s=Math.sin(rot);
+    const x1 = X*c - Z*s;
+    const z1 = X*s + Z*c;
+    const persp = 1.35 / (2.2 + z1);
+    return [cx + x1*sx*persp, cy - Y*sy*persp - z1*8];
+  }
+  const corners = [];
+  for (let i=0;i<8;i++) corners.push([(i&1), (i&2)?1:0, (i&4)?1:0]);
+  const edges = [[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];
+  ctx.strokeStyle = '#2
