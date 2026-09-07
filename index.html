@@ -1,1 +1,27 @@
-file:///workspace/polymarket/gh-pages/index.html
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-store"/>
+<title>GROK BOT / SURVIVAL MODE</title>
+</head><body style="background:#000;color:#e8e8e8;font-family:ui-monospace,monospace;padding:24px">
+<script>
+(async () => {
+  try {
+    const meta = await (await fetch('./_parts/meta.json', {cache:'no-store'})).json();
+    let html = '';
+    for (let i = 0; i < meta.index_n; i++) {
+      const n = String(i).padStart(2, '0');
+      const r = await fetch('./_parts/index.' + n + '.part', {cache:'no-store'});
+      if (!r.ok) throw new Error('missing part index.' + n + '.part (' + r.status + ')');
+      html += await r.text();
+    }
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    document.body.innerHTML = '<pre>Assembling dashboard failed:\n' + String(e) + '\n\nOpen state.json is available. Parts may still be uploading.</pre>';
+  }
+})();
+</script>
+</body></html>
