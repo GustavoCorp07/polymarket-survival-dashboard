@@ -1,0 +1,114 @@
+nel log">
+        <div class="panel-h">
+          <span>// ACTIVITY LOG</span>
+          <span class="r"><span id="resolved">0</span> RESOLVED</span>
+        </div>
+        <div id="activity"></div>
+      </div>
+      <div class="panel space">
+        <div class="panel-h">
+          <span>// MARKET SPACE · LIVE SCAN</span>
+          <span class="r"><span id="liveN">0</span> LIVE</span>
+        </div>
+        <div class="space-body"><canvas id="mktCanvas"></canvas></div>
+        <div class="space-foot">
+          <span>x LIQUIDITY &nbsp; y EDGE &nbsp; z BOOK</span>
+          <span><span id="cryptoN">CRYPTO 0</span> &nbsp; <span id="weatherN">WEATHER 0</span> &nbsp; <span id="overN">0 OVER +8.0%</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="strip-h">
+      <span>// SURVIVAL + LEDGER</span>
+      <span>KILL AT $<span id="killAt">0.00</span> · <span id="cyc48">288</span> CYCLES / 48H</span>
+    </div>
+    <div class="strip-row">
+      <div class="metric">
+        <div class="ml">RUNWAY</div>
+        <div class="mv" id="runway">0 days</div>
+        <div class="runway-bar"><i id="runwayBar" style="width:0%"></i></div>
+      </div>
+      <div class="metric"><div class="ml">DAILY COST</div><div class="mv red" id="dailyCost">-$6.58</div></div>
+      <div class="metric"><div class="ml">TRADES</div><div class="mv" id="trades">0</div></div>
+      <div class="metric"><div class="ml">SCANNED</div><div class="mv" id="scanned">0</div></div>
+      <div class="metric"><div class="ml">AVG BET</div><div class="mv" id="avgBet">$0.00</div></div>
+      <div class="metric"><div class="ml">AVG EDGE</div><div class="mv" id="avgEdge">0.0%</div></div>
+      <div class="metric"><div class="ml">BEST</div><div class="mv green" id="best">+$0.00</div></div>
+      <div class="metric"><div class="ml">WORST</div><div class="mv" id="worst">+$0.00</div></div>
+    </div>
+  </div>
+
+  <div class="agents" id="agents"></div>
+
+  <div class="ftr">
+    <div class="left" id="footerLeft">GROK BOT · POLYMARKET · PAPER · AUTONOMOUS · KIMI K3</div>
+    <div class="wm">ARGONA</div>
+    <div class="right">NEXT CYCLE <span id="nextCycle">10:00</span></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let lastState = null;
+let rot = 0.35;
+let pollBusy = false;
+let activityFp = '';
+let agentsFp = '';
+let balanceFp = '';
+let baseUptimeSec = 0;
+let baseUptimeAt = performance.now();
+let nextCycleTs = null;
+let userPinnedLog = false;
+
+function fmtMoney(n, sign=false) {
+  const v = Number(n)||0;
+  const abs = Math.abs(v).toFixed(2);
+  if (sign) return (v>=0? '+':'−') + '$' + abs;
+  return '$' + abs;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function setText(id, text) {
+  const el = $(id);
+  if (!el) return;
+  const t = String(text);
+  if (el.textContent !== t) el.textContent = t;
+}
+function setStatus(s) {
+  const pill = $('statusPill');
+  const cls = 'pill ' + (s||'BOOT').toLowerCase();
+  if (pill.className !== cls) pill.className = cls;
+  setText('statusTxt', s || 'BOOT');
+}
+function fmtUptime(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function iconSvg(kind, color) {
+  const eyes = `<rect x="10" y="11" width="2.2" height="8" rx="1" fill="#000"/><rect x="15.8" y="11" width="2.2" height="8" rx="1" fill="#000"/>`;
+  if (kind==='cloud') return `<svg width="28" height="28" viewBox="0 0 28 28"><ellipse cx="14" cy="15" rx="12" ry="9" fill="${color}"/>${eyes}</svg>`;
+  if (kind==='circle') return `<svg width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="${color}"/>${eyes}</svg>`;
+  if (kind==='drop') return `<svg width="28" height="28" viewBox="0 0 28 28"><path d="M14 2 C14 2 24 14 24 18 A10 10 0 0 1 4 18 C4 14 14 2 14 2Z" fill="${color}"/>${eyes}</svg>`;
+  if (kind==='pill') return `<svg width="28" height="28" viewBox="0 0 28 28"><rect x="3" y="8" width="22" height="12" rx="6" fill="${color}"/>${eyes}</svg>`;
+  if (kind==='triangle') return `<svg width="28" height="28" viewBox="0 0 28 28"><path d="M14 3 L26 24 L2 24 Z" fill="${color}"/><rect x="10" y="13" width="2.2" height="7" rx="1" fill="#000"/><rect x="15.8" y="13" width="2.2" height="7" rx="1" fill="#000"/></svg>`;
+  return `<svg width="28" height="28" viewBox="0 0 28 28"><rect x="4" y="4" width="20" height="20" rx="5" fill="${color}"/>${eyes}</svg>`;
+}
+
+function drawAgents(agents) {
+  const fp = JSON.stringify(agents||[]);
+  if (fp === agentsFp) return;
+  agentsFp = fp;
+  const root = $('agents');
+  root.innerHTML = '';
+  (agents||[]).forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'agent';
+    const c = a.color || '#888';
+    el.innerHTML = `
+      <div class="num">${escapeHtml(a.id||'')}</div>
+      <div clas
