@@ -643,9 +643,20 @@ async function poll() {
   if (pollBusy) return;
   pollBusy = true;
   try {
-    const r = await fetch('/api/state?t=' + Date.now(), {cache:'no-store'});
-    if (!r.ok) throw new Error('state '+r.status);
-    const st = await r.json();
+    const bust = Date.now();
+    // Live desk first; GitHub Pages falls back to static state.json snapshot.
+    const urls = ['/api/state?t=' + bust, './state.json?t=' + bust, 'state.json?t=' + bust];
+    let st = null;
+    let lastErr = null;
+    for (const u of urls) {
+      try {
+        const r = await fetch(u, {cache:'no-store'});
+        if (!r.ok) { lastErr = new Error('state '+r.status+' '+u); continue; }
+        st = await r.json();
+        break;
+      } catch (e) { lastErr = e; }
+    }
+    if (!st) throw lastErr || new Error('no state');
     render(st);
   } catch (e) {
     console.warn(e);

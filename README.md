@@ -1,8 +1,7 @@
-# Polymarket Survival Mode Dashboard
+# Polymarket Survival Mode (paper)
 
-Static mirror of the Argona-style GROK BOT / SURVIVAL MODE paper desk UI.
+Static snapshot of the Grok Bot Survival Mode desk.
 
-- Live local desk runs on the agent computer at http://127.0.0.1:8765/
-- This Pages build loads `state.json` (snapshot) or `/api/state` when a backend is present.
+Live desk runs on the agent computer at `http://127.0.0.1:8765/`.
 
-Paper only. No private keys. Kimi fair-value requires API key on the local desk.
+This Pages site loads `state.json` (refreshed after each paper cycle).
