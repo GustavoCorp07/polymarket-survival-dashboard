@@ -643,17 +643,9 @@ async function poll() {
   if (pollBusy) return;
   pollBusy = true;
   try {
-    const urls = ['/api/state?t=' + Date.now(), './state.json?t=' + Date.now()];
-    let st = null, lastErr = null;
-    for (const url of urls) {
-      try {
-        const r = await fetch(url, {cache:'no-store'});
-        if (!r.ok) throw new Error(url + ' ' + r.status);
-        st = await r.json();
-        break;
-      } catch (e) { lastErr = e; }
-    }
-    if (!st) throw lastErr || new Error('no state');
+    const r = await fetch('/api/state?t=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error('state '+r.status);
+    const st = await r.json();
     render(st);
   } catch (e) {
     console.warn(e);
